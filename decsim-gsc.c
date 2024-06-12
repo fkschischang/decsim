@@ -24,18 +24,18 @@
 /*
 	Modified by Mohannad Shehadeh. 
 	ONLY TESTED TO COMPILE WITH GCC AND NOT NECESSARILY COMPLIANT! 
-	
-	This implements a variant of the scheme with Golomb rulers 
-	rather than linear rulers. Instead of constraining adjacent blocks 
-	i - k for k = 0, 1, ..., M together, we constrain blocks 
-	i - GOLOMB[k] for k = 0, 1, ..., M together. The component 
+
+	The changes are summarized as follows:
+
+	1. A variant of the scheme with Golomb rulers
+	rather than linear rulers was implemented. Instead of constraining
+	adjacent blocks i - k for k = 0, 1, ..., M together, we constrain
+	blocks i - GOLOMB[k] for k = 0, 1, ..., M together. The component
 	code length remains the same but the memory requirement becomes 
 	GOLOMB[M] which is the value assigned to the parameter MEMORY. 
 	As before, conventional staircase codes are recovered when M = 1
 	in which case MEMORY = 1. 
-	 
-	The other primary changes are as follows:
-	1. The non-systematic parity-check matrix is replaced with a systematic
+	2. The non-systematic parity-check matrix is replaced with a systematic
 	one with two functions implementing the forward and inverse systematizing
 	permutations. These are called synFromErrorloc which generates the columns
 	of the parity-check matrix and errorlocFromSyn which inverts synFromErrorloc.
@@ -45,8 +45,9 @@
 	is not a column of the parity-check matrix due to code shortening. In this 
 	case, the convention adopted is that errorlocFromSyn should return a value
 	larger than S*(M+1)-1. Note that this does not require using any more bits 
-	than would already be necessary to represent S*(M+1) error locations. 
-	2. The unterminated/convolutional scheme is converted into a strict block
+	than would already be necessary to represent S*(M+1) error locations and is
+	naturally accomplished by algebraic permutations.
+	3. The unterminated/convolutional scheme is converted into a strict block
 	coding scheme by specifying a frame length parameter F and performing a 
 	pseudotermination procedure described further below. The frame length is
 	expected to be much larger than the decoding window to mitigate the rate
@@ -55,22 +56,24 @@
 	Conversion into a strict block coding scheme allows for sound
 	measurements of BERs and FERs in the waterfall regime where the dominant
 	error events are error propagation events.  
-	3. The -b command-line argument specifying a number of blocks to transmit
+	4. The -b command-line argument specifying a number of blocks to transmit
 	is replaced with an -f command-line argument specifying a number of
 	frames to transmit. 
-	4. The -e parameter now specifies a number of frame errors to 
+	5. The -e parameter now specifies a number of frame errors to
 	measure before stopping and a batch is defined in terms of a number 
 	of frames. 
-	5. The maximum memory is increased to 15. Arbitrary linear permutations
+	6. The maximum memory is increased to 15. Arbitrary linear permutations
 	can be specified by altering the definitions.
-	6. A decoding sweep now comprises only checking component codewords
-	whose entire span is in the receiver buffer. As currently implemented, 
-	both the syndrome and the received data buffers store slightly more 
-	information than is actually needed (and used) but this allows for more 
-	elegant code without bounds checking. This need not be done for a 
-	memory-constrained hardware implementation. 
-	7. 64-bit integers are used for computing permutations to prevent 
+	7. A decoding sweep now comprises only checking component codewords
+	whose entire span is in the receiver buffer.
+	8. 64-bit integers are used for computing permutations to prevent
 	overflow issues. 
+	9. A significant change has been made where the modulo-(B=W+MEMORY) indexing
+	was replaced with modulo-W indexing and all buffer sizes are now only W. The
+	way the change was implemented is documented near the relevant functions. As
+	a part of this, the syndromes associated with a modulo-W block index are now
+	those corresponding to component codewards which START at that block. Importantly,
+    we no longer reserve more memory than is actually needed or used.
 */
 
 /*
@@ -79,7 +82,7 @@
    S:   Width of a staircase block; each square block contains S*S bits.
    M:   Memory parameter.  Extended Hamming codewords have length S*(M+1).
    W:   Decoding window size in number of staircase blocks. 
-   F:	Frame length. Number of staircase blocks from which to form a frame.
+   F:   Frame length. Number of staircase blocks from which to form a frame.
 
    BatchSize: number of frames to process between error-count
               valuations.
@@ -87,15 +90,6 @@
    SweepsPerBlock: maximum number of newest-to-oldest sweeps before
                    receiving next block.
    MaxBatches: maximum number of batches to send.
-
-
-   Though somewhat wasteful of memory, the receiver circular buffer size 
-   is taken to be B = W + MEMORY with MEMORY zero blocks kept in the buffer as this 
-   simplifies management of the correspondence between blocks and syndromes. 
-   All index arithmetic is performed modulo B.  
-   If the "Newest" (just received) block is at index i, then the blocks
-   at index i+1, i+2, ..., i+MEMORY are zero, and the "Oldest Block" appears
-   at index i+MEMORY+1.
 
    Consider the parity-check matrix for an extended binary 
    Hamming code whose columns are the binary representations of 
@@ -125,7 +119,7 @@
 */
 
 /*
-	FRAMING/PSEUDOTERMINATION PROCEDURE:	
+	FRAMING/PSEUDOTERMINATION PROCEDURE:
 	
 	Specify a frame length F in number of blocks to simulate the block 
 	code obtained by the following pseudotermination procedure:  
@@ -148,63 +142,79 @@
 
 
 /* The following parameters completely specify the code and decoding scheme: */
-// Decoding window size is W, suggested value is 3*(MEMORY+1) to 5*(MEMORY+1) 
+// Decoding window size is W, suggested value is 2*(MEMORY+1) to 5*(MEMORY+1)
 // The MEMORY parameter is not to be modified directly, only via M 
 #define S 179
 #define M 4
 #if (M == 0)
 	static const int GOLOMB[M+1] = {0};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {0};
 	#define MEMORY 0
 #elif (M == 1)
 	static const int GOLOMB[M+1] = {0, 1};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {1, 0};
 	#define MEMORY 1
 #elif (M == 2)
 	static const int GOLOMB[M+1] = {0, 1, 3};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {3, 2, 0};
 	#define MEMORY 3
 #elif (M == 3)
 	static const int GOLOMB[M+1] = {0, 1, 4, 6};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {6, 5, 2, 0};
 	#define MEMORY 6
 #elif (M == 4)
 	static const int GOLOMB[M+1] = {0, 1, 4, 9, 11};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {11, 10, 7, 2, 0};
 	#define MEMORY 11
 #elif (M == 5)
 	static const int GOLOMB[M+1] = {0, 1, 4, 10, 12, 17};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {17,  16,  13,  7,  5,  0};
 	#define MEMORY 17
 #elif (M == 6)
 	static const int GOLOMB[M+1] = {0, 1, 4, 10, 18, 23, 25};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {25,  24,  21,  15,  7,  2,  0};
 	#define MEMORY 25
 #elif (M == 7)
 	static const int GOLOMB[M+1] = {0, 1, 4, 9, 15, 22, 32, 34};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {34,  33,  30,  25,  19,  12,  2,  0};
 	#define MEMORY 34
 #elif (M == 8)
 	static const int GOLOMB[M+1] = {0, 1, 5, 12, 25, 27, 35, 41, 44};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {44,  43,  39,  32,  19,  17,  9,  3,  0};
 	#define MEMORY 44
 #elif (M == 9)	
 	static const int GOLOMB[M+1] = {0, 1, 6, 10, 23, 26, 34, 41, 53, 55};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {55,  54,  49,  45,  32,  29,  21,  14,  2,  0};
 	#define MEMORY 55
 #elif (M == 10)
 	static const int GOLOMB[M+1] = {0, 1, 4, 13, 28, 33, 47, 54, 64, 70, 72};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {72,  71,  68,  59,  44,  39,  25,  18,  8, 2,  0};
 	#define MEMORY 72
 #elif (M == 11)
 	static const int GOLOMB[M+1] = {0, 2, 6, 24, 29, 40, 43, 55, 68, 75, 76, 85};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {85,  83,  79,  61,  56,  45,  42,  30,  17,  10,  9,  0};
 	#define MEMORY 85
 #elif (M == 12)
 	static const int GOLOMB[M+1] = {0, 2, 5, 25, 37, 43, 59, 70, 85, 89, 98, 99, 106};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {106,  104,  101,  81,  69,  63,  47,  36,  21,  17,  8,  7,  0};
 	#define MEMORY 106
 #elif (M == 13)
 	static const int GOLOMB[M+1] = {0, 4, 6, 20, 35, 52, 59, 77, 78, 86, 89, 99, 122, 127};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {127,  123,  121,  107,  92,  75,  68,  50,  49,  41,  38,  28,  5,  0};
 	#define MEMORY 127
 #elif (M == 14)
 	static const int GOLOMB[M+1] = {0, 4, 20, 30, 57, 59, 62, 76, 100, 111, 123, 136, 144, 145, 151};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {151,  147,  131,  121,  94,  92,  89,  75,  51,  40,  28,  15,  7, 6,  0};
 	#define MEMORY 151
 #elif (M == 15)
 	static const int GOLOMB[M+1] = {0, 1, 4, 11, 26, 32, 56, 68, 76, 115, 117, 134, 150, 163, 168, 177};
+    static const int MEMORY_MINUS_GOLOMB[M+1] = {177,  176,  173,  166,  151,  145,  121,  109,  101,  62,  60,  43,  27,  14, 9,  0};
 	#define MEMORY 177
 #endif
 #define W (3*(MEMORY+1))
 #define F 1634
 // Number of iterations (unless specified by command-line argument -s)
-#define DefaultSweepsPerBlock 4 
+#define DefaultSweepsPerBlock 4
 
 
 /* 	The following parameters are the simulation parameters unless 
@@ -224,9 +234,8 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <unistd.h>
 #define SS (S*S)
-// Receiver circular buffer size
-#define B (W + MEMORY)
 
 /********************************************************************
    PERMUTATIONS
@@ -439,28 +448,34 @@ typedef int64_t (*ZZtoZ)(int64_t, int64_t);  /* ptr to function mapping (int64_t
 /* GLOBAL VARIABLES */
 
 /* pointers to bijection functions */
-ZZtoZ pos[MAXM+1] = {pos_0, pos_1, pos_2, pos_3, pos_4, pos_5, pos_6, pos_7, 
-						pos_8, pos_9, pos_10, pos_11, pos_12, pos_13, pos_14, pos_15};
-ZtoZ  row[MAXM+1] = {row_0, row_1, row_2, row_3, row_4, row_5, row_6, row_7, 
-						row_8, row_9, row_10, row_11, row_12, row_13, row_14, row_15};
-ZtoZ  col[MAXM+1] = {col_0, col_1, col_2, col_3, col_4, col_5, col_6, col_7, 
-						col_8, col_9, col_10, col_11, col_12, col_13, col_14, col_15};
-						
-/* Received bits; one per byte, circular buffer */
-unsigned char RXbuffer[SS*B];
+ZZtoZ pos[MAXM+1] = {pos_0, pos_1, pos_2, pos_3, pos_4, pos_5, pos_6, pos_7, pos_8, pos_9, pos_10, pos_11, pos_12, pos_13, pos_14, pos_15};
+ZtoZ  row[MAXM+1] = {row_0, row_1, row_2, row_3, row_4, row_5, row_6, row_7, row_8, row_9, row_10, row_11, row_12, row_13, row_14, row_15};
+ZtoZ  col[MAXM+1] = {col_0, col_1, col_2, col_3, col_4, col_5, col_6, col_7, col_8, col_9, col_10, col_11, col_12, col_13, col_14, col_15};
 
-/* S complete syndromes per block + MEMORY partial syndromes, circular  */
-uint32_t Syndrome[S*B];
+// All circular buffer indexing is modulo W
 
-/* We need to keep track of the index of the "Newest" (most recently received)
-   block in the buffer. */
+// Receiver circular buffer of W blocks of S*S = SS bits:
+unsigned char RXbuffer[SS*W];
+
+/* Index of the "Newest" (most recently received)
+   block in the circular buffer. */
 uint32_t NewestBlock;
 
-/* We track the Hamming weight of each block */
-uint32_t BlockWeight[B];
+/*
+ * Circular buffer of W groups of S syndromes
+ * The group with modulo-W index i consists of the S syndromes
+ * corresponding to the S component codewords which START at block i.
+ * The MEMORY newest syndrome groups are partial syndromes since the
+ * remainder of the corresponding component codewords has not been received yet.
+ * The W-MEMORY oldest syndrome groups correspond to complete component codewords
+ * in the RXbuffer and are decoded during an iteration.
+*/
+uint32_t Syndrome[S*W];
+
+// Circular buffer of Hamming weights of each block for error-counting
+uint32_t BlockWeight[W];
 
 int parity; // Number of component code parity bits
-
 // Variables and LUTs for defining systematizing permutation 
 // via invertible affine transformation of column index:
 uint32_t m; // Parent [2^m, 2^m - (m+1)] extended Hamming code parameter
@@ -680,32 +695,63 @@ inline uint32_t errorlocFromSyn(uint32_t x) {
 	return (ainv*((x>>1)+mb))&mask;
 }
 
+/*
+ * Functions for flipping the bit in a given position
+ * by updating the state of the three circular buffers
+ * RXbuffer, Syndrome, and BlockWeight.
+ * We assume 0 <= block < W, and 0 <= posn < S*S.
+ */
+/*
+ * We have two flipping functions. flip_old is for the
+ * MEMORY oldest blocks for which we have fewer associated
+ * syndromes since part of the corresponding component codewords
+ * has been dumped/delivered.
+ * We don't want to wrap around and modify the partial syndromes
+ * corresponding to the MEMORY newest blocks in this case.
+ * flip_old requires the "age" of a block which can be counted
+ * and passed to it during a decoding sweep/iteration.
+ * flip is for the W-MEMORY newest blocks.
+ */
 
-/* Flip a bit in a given block in a given position. */
-/* We assume 0 <= block < B, and 0 <= posn < S*S.   */
-void flip(uint32_t block, uint32_t posn){
+// Assumes block is NewestBlock-0, NewestBlock-1, ..., NewestBlock-(W-1-MEMORY)
+// i.e., "age" of block is less than or equal to W-1-MEMORY
+void flip(uint32_t block, uint32_t posn) {
     int i, j, k;
     unsigned char *p = RXbuffer + block*SS + posn;
-    if (*p)  /* is this a one? */
-    {
+    if (*p) { /* is this a one? */
         --BlockWeight[block];
         *p = '\0';
-    }
-    else
-    {
+    } else {
         ++BlockWeight[block];
         *p = '\1';
     }
-    /* update syndromes */
-    for (k=0; k <= M; ++k) {
+    for (k=M; k >= 0; --k) {
         i = row[k](posn);
         j = col[k](posn);
-        // k = 0,1,..., M 
-        // --> k = 2^0 - 1 = 0, 2^1 - 1 = 1, 2^2 - 1 = 3, 2^4 - 1 = 7,
-        // ..., 2^M - 1 = MEMORY
-		//Syndrome[((block+k)%B)*S+i] ^= synFromErrorloc((M-k)*S+j);
-		//Syndrome[((block+(1<<k)-1)%B)*S+i] ^= synFromErrorloc((M-k)*S+j);
-		Syndrome[((block+GOLOMB[k])%B)*S+i] ^= synFromErrorloc((M-k)*S+j);
+        //Syndrome[((block-MEMORY+GOLOMB[k]+W)%W)*S+i] ^= synFromErrorloc((M-k)*S+j);
+        Syndrome[((block-MEMORY_MINUS_GOLOMB[k]+W)%W)*S+i] ^= synFromErrorloc((M-k)*S+j);
+    }
+}
+// Assumes block is NewestBlock-(W-1-MEMORY)-1, NewestBlock-(W-1-MEMORY)-2, ..., NewestBlock-(W-1-MEMORY)-MEMORY = NewestBlock-(W-1)
+// i.e., "age" of block is greater than W-1-MEMORY, or block is one of the MEMORY oldest blocks
+void flip_old(uint32_t block, uint32_t posn, uint32_t age) {
+    int i, j, k;
+    unsigned char *p = RXbuffer + block*SS + posn;
+    if (*p) { /* is this a one? */
+        --BlockWeight[block];
+        *p = '\0';
+    } else {
+        ++BlockWeight[block];
+        *p = '\1';
+    }
+    k = M;
+    while (1) {
+        if (MEMORY_MINUS_GOLOMB[k]+age >= W) break;
+        i = row[k](posn);
+        j = col[k](posn);
+        //Syndrome[((block-MEMORY+GOLOMB[k]+W)%W)*S+i] ^= synFromErrorloc((M-k)*S+j);
+        Syndrome[((block-MEMORY_MINUS_GOLOMB[k]+W)%W)*S+i] ^= synFromErrorloc((M-k)*S+j);
+        k--;
     }
 }
 
@@ -728,13 +774,11 @@ void ReceiveBlock(float p){
     int posn;
     float k;
     union { float r; uint32_t i; } x;
-    uint32_t PreviousOldestBlock;
 
-    if (++NewestBlock >= B) NewestBlock = 0; // mod B increment
-    PreviousOldestBlock = (NewestBlock + MEMORY)%B;
-    memset(RXbuffer+PreviousOldestBlock*SS, 0, SS*sizeof(unsigned char));
-    memset(Syndrome+PreviousOldestBlock*S, 0, S*sizeof(uint32_t));
-    BlockWeight[PreviousOldestBlock] = 0;
+    if (++NewestBlock >= W) NewestBlock = 0; // mod W increment
+    memset(RXbuffer+NewestBlock*SS, 0, SS*sizeof(unsigned char));
+    memset(Syndrome+NewestBlock*S, 0, S*sizeof(uint32_t));
+    BlockWeight[NewestBlock] = 0;
 
     k = 1.0f/logf(1.0f-p);
     posn = -1;
@@ -754,13 +798,11 @@ void ReceivePseudoterminationBlock(float p){
     int posn;
     float k;
     union { float r; uint32_t i; } x;
-    uint32_t PreviousOldestBlock;
 
-    if (++NewestBlock >= B) NewestBlock = 0; // mod B increment
-    PreviousOldestBlock = (NewestBlock + MEMORY)%B;
-    memset(RXbuffer+PreviousOldestBlock*SS, 0, SS*sizeof(unsigned char));
-    memset(Syndrome+PreviousOldestBlock*S, 0, S*sizeof(uint32_t));
-    BlockWeight[PreviousOldestBlock] = 0;
+    if (++NewestBlock >= W) NewestBlock = 0; // mod W increment
+    memset(RXbuffer+NewestBlock*SS, 0, SS*sizeof(unsigned char));
+    memset(Syndrome+NewestBlock*S, 0, S*sizeof(uint32_t));
+    BlockWeight[NewestBlock] = 0;
 
     k = 1.0f/logf(1.0f-p);
     posn = -1;
@@ -782,10 +824,10 @@ void ReceivePseudoterminationBlock(float p){
 */
 void Initialize(){
     /* zero global arrays */
-    memset(RXbuffer, 0, S*S*B*sizeof(unsigned char));
-    memset(Syndrome, 0, S*B*sizeof(uint32_t));
-    memset(BlockWeight, 0, B*sizeof(uint32_t));
-    NewestBlock = B-1;
+    memset(RXbuffer, 0, S*S*W*sizeof(unsigned char));
+    memset(Syndrome, 0, S*W*sizeof(uint32_t));
+    memset(BlockWeight, 0, W*sizeof(uint32_t));
+    NewestBlock = W-1;
 }
 
 
@@ -799,69 +841,49 @@ int sweep() {
     uint32_t errorloc;  /* error location within codeword */
     int perm;   /* index of permutation to apply to (i,j) to get position */
     int count = 0;  /* number of corrections performed     */
-
-    /* Sweep back from syndromes recorded in NewestBlock    */
-    /* or earlier.                                          */
-    block = NewestBlock;
-    for (k=0; k < B-2*MEMORY; ++k) {
+    // The MEMORY number of syndrome groups with indices
+    // NewestBlock-0, NewestBlock-1, ..., NewestBlock-(MEMORY-1)
+    // are not yet completed.
+    // Therefore, decoding starts at NewestBlock-MEMORY and decrements
+    // covering W-MEMORY completed syndrome groups.
+    // First, we do the W-2*MEMORY newest syndrome groups
+    // and then the MEMORY oldest for a total of (W-MEMORY) syndrome groups
+    // or (W-MEMORY)*S decodings
+    block = (NewestBlock-MEMORY+W)%W;
+    for (k=0; k < W-2*MEMORY; ++k) {
         for (i=0; i < S; ++i) {
             syn = Syndrome[block*S + i];
-			if (syn & 0x01) { 
+            if (syn & 0x01) {
                 errorloc = errorlocFromSyn(syn);
                 if (errorloc < S*(M+1)) {
-                	j = errorloc % S;     /* j is the column index */
-                	perm = M - errorloc/S; 
-                	// perm is in 0,1,2,...,M
-                	// perm --> 2^perm - 1
-                	//flip((B+block-perm)%B, pos[perm](i, j));
-                	//flip((B+block-(1<<perm)+1)%B, pos[perm](i, j));
-                	flip((B+block-GOLOMB[perm])%B, pos[perm](i, j));
-                	count += 1;
+                    j = errorloc % S;     /* j is the column index */
+                    perm = M - errorloc/S;
+                    //flip((block+MEMORY-GOLOMB[perm])%W, pos[perm](i, j));
+                    flip((block+MEMORY_MINUS_GOLOMB[perm])%W, pos[perm](i, j));
+                    count += 1;
                 }
             }
         }
-        if (--block < 0) block = B-1; // mod B decrement 
+        if (--block < 0) block = W-1; // mod W decrement
+    }
+    for (k = W-2*MEMORY; k < W-MEMORY; ++k) {
+        for (i=0; i < S; ++i) {
+            syn = Syndrome[block*S + i];
+            if (syn & 0x01) {
+                errorloc = errorlocFromSyn(syn);
+                if (errorloc < S*(M+1)) {
+                    j = errorloc % S;     /* j is the column index */
+                    perm = M - errorloc/S;
+                    //flip_old((block+MEMORY-GOLOMB[perm])%W, pos[perm](i, j), k+GOLOMB[perm]);
+                    flip_old((block+MEMORY_MINUS_GOLOMB[perm])%W, pos[perm](i, j), k+GOLOMB[perm]);
+                    count += 1;
+                }
+            }
+        }
+        if (--block < 0) block = W-1; // mod W decrement
     }
     return count;
 }
-
-#ifdef IGNORE
-void PrintBuff()  /* print buffer */
-{
-    int i, j, k;
-    for (i=0; i < S; ++i)
-    {
-        putchar('|');
-        for (k=0; k < B; ++k)
-        {
-            for (j=0; j < S; ++j)
-            {
-                if (RXbuffer[SS*k + i*S + j])
-                    putchar('.');
-                else
-                    putchar(' ');
-            }
-            putchar('|');
-        }
-        putchar('\n');
-    }
-    printf("Newest Block: %d\n", NewestBlock);
-    printf("Block weights:");
-    for (k=0; k < B; ++k)
-    {
-        printf(" %d", BlockWeight[k]);
-    }
-    putchar('\n');
-    for (k=0; k < B; ++k)
-    {
-       printf("Block[%d]:", k);
-       for (i=0; i < S; ++i)
-           printf(" %d", Syndrome[k*S+i]);
-       putchar('\n');
-    }
-}
-#endif
-
 
 /* HELPER FUNCTIONS */
 int pow2ge(int n)  /* find smallest nonnegative power of two >= n */
@@ -1009,10 +1031,13 @@ int main(int argc, char **argv){
              "Incompatible floating point representation -- sorry.\n");
          exit(1);
     }
-    /* seed the prng using current system time */
-    pcg32_srandom_r(time(NULL), time(NULL)*17);//add back!
-    // pcg32_srandom_r(123456789,987654321);  /* for debugging */
-	
+    /* seed the prng using current system time and process ID */
+    uint64_t PRNG_SEED = time(NULL) ^ (getpid()*getpid());
+    printf("PRNG_SEED = %lu \n", PRNG_SEED);
+    pcg32_srandom_r(PRNG_SEED, PRNG_SEED*17);
+    //pcg32_srandom_r(time(NULL), time(NULL)*17);
+    //pcg32_srandom_r(123456789,987654321);  /* for debugging */
+	//pcg32_srandom_r(123,991);  /* for debugging */
 	
     float p;  /* BSC crossover probability  */
     float g;  /* gap in dB to Shannon limit */
@@ -1281,7 +1306,7 @@ int main(int argc, char **argv){
 			// the first F-W-W information-bearing blocks
 			for (block=0; block < (F-W-W); ++block) {
 				++BlocksDecoded;
-				BitErrors += BlockWeight[(NewestBlock+MEMORY+1)%B];
+				BitErrors += BlockWeight[(NewestBlock+1)%W];
 				ReceiveBlock(p); 
 				for (sweepcnt = 0; sweepcnt < ActualSweepsPerBlock; ++sweepcnt) {
 					if (!sweep()) {
@@ -1293,7 +1318,7 @@ int main(int argc, char **argv){
 			// the last W information-bearing blocks
 			for (block=0; block < W; ++block) {
 				++BlocksDecoded;
-				BitErrors += BlockWeight[(NewestBlock+MEMORY+1)%B];
+				BitErrors += BlockWeight[(NewestBlock+1)%W];
 				ReceivePseudoterminationBlock(p);
 				for (sweepcnt = 0; sweepcnt < ActualSweepsPerBlock; ++sweepcnt) {
 					if (!sweep()) {
