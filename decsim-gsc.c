@@ -147,67 +147,67 @@
 #define S 179
 #define M 4
 #if (M == 0)
-	static const int GOLOMB[M+1] = {0};
+	//static const int GOLOMB[M+1] = {0};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {0};
 	#define MEMORY 0
 #elif (M == 1)
-	static const int GOLOMB[M+1] = {0, 1};
+	//static const int GOLOMB[M+1] = {0, 1};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {1, 0};
 	#define MEMORY 1
 #elif (M == 2)
-	static const int GOLOMB[M+1] = {0, 1, 3};
+	//static const int GOLOMB[M+1] = {0, 1, 3};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {3, 2, 0};
 	#define MEMORY 3
 #elif (M == 3)
-	static const int GOLOMB[M+1] = {0, 1, 4, 6};
+	//static const int GOLOMB[M+1] = {0, 1, 4, 6};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {6, 5, 2, 0};
 	#define MEMORY 6
 #elif (M == 4)
-	static const int GOLOMB[M+1] = {0, 1, 4, 9, 11};
+	//static const int GOLOMB[M+1] = {0, 1, 4, 9, 11};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {11, 10, 7, 2, 0};
 	#define MEMORY 11
 #elif (M == 5)
-	static const int GOLOMB[M+1] = {0, 1, 4, 10, 12, 17};
+	//static const int GOLOMB[M+1] = {0, 1, 4, 10, 12, 17};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {17,  16,  13,  7,  5,  0};
 	#define MEMORY 17
 #elif (M == 6)
-	static const int GOLOMB[M+1] = {0, 1, 4, 10, 18, 23, 25};
+	//static const int GOLOMB[M+1] = {0, 1, 4, 10, 18, 23, 25};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {25,  24,  21,  15,  7,  2,  0};
 	#define MEMORY 25
 #elif (M == 7)
-	static const int GOLOMB[M+1] = {0, 1, 4, 9, 15, 22, 32, 34};
+	//static const int GOLOMB[M+1] = {0, 1, 4, 9, 15, 22, 32, 34};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {34,  33,  30,  25,  19,  12,  2,  0};
 	#define MEMORY 34
 #elif (M == 8)
-	static const int GOLOMB[M+1] = {0, 1, 5, 12, 25, 27, 35, 41, 44};
+	//static const int GOLOMB[M+1] = {0, 1, 5, 12, 25, 27, 35, 41, 44};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {44,  43,  39,  32,  19,  17,  9,  3,  0};
 	#define MEMORY 44
 #elif (M == 9)	
-	static const int GOLOMB[M+1] = {0, 1, 6, 10, 23, 26, 34, 41, 53, 55};
+	//static const int GOLOMB[M+1] = {0, 1, 6, 10, 23, 26, 34, 41, 53, 55};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {55,  54,  49,  45,  32,  29,  21,  14,  2,  0};
 	#define MEMORY 55
 #elif (M == 10)
-	static const int GOLOMB[M+1] = {0, 1, 4, 13, 28, 33, 47, 54, 64, 70, 72};
+	//static const int GOLOMB[M+1] = {0, 1, 4, 13, 28, 33, 47, 54, 64, 70, 72};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {72,  71,  68,  59,  44,  39,  25,  18,  8, 2,  0};
 	#define MEMORY 72
 #elif (M == 11)
-	static const int GOLOMB[M+1] = {0, 2, 6, 24, 29, 40, 43, 55, 68, 75, 76, 85};
+	//static const int GOLOMB[M+1] = {0, 2, 6, 24, 29, 40, 43, 55, 68, 75, 76, 85};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {85,  83,  79,  61,  56,  45,  42,  30,  17,  10,  9,  0};
 	#define MEMORY 85
 #elif (M == 12)
-	static const int GOLOMB[M+1] = {0, 2, 5, 25, 37, 43, 59, 70, 85, 89, 98, 99, 106};
+	//static const int GOLOMB[M+1] = {0, 2, 5, 25, 37, 43, 59, 70, 85, 89, 98, 99, 106};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {106,  104,  101,  81,  69,  63,  47,  36,  21,  17,  8,  7,  0};
 	#define MEMORY 106
 #elif (M == 13)
-	static const int GOLOMB[M+1] = {0, 4, 6, 20, 35, 52, 59, 77, 78, 86, 89, 99, 122, 127};
+	//static const int GOLOMB[M+1] = {0, 4, 6, 20, 35, 52, 59, 77, 78, 86, 89, 99, 122, 127};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {127,  123,  121,  107,  92,  75,  68,  50,  49,  41,  38,  28,  5,  0};
 	#define MEMORY 127
 #elif (M == 14)
-	static const int GOLOMB[M+1] = {0, 4, 20, 30, 57, 59, 62, 76, 100, 111, 123, 136, 144, 145, 151};
+	//static const int GOLOMB[M+1] = {0, 4, 20, 30, 57, 59, 62, 76, 100, 111, 123, 136, 144, 145, 151};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {151,  147,  131,  121,  94,  92,  89,  75,  51,  40,  28,  15,  7, 6,  0};
 	#define MEMORY 151
 #elif (M == 15)
-	static const int GOLOMB[M+1] = {0, 1, 4, 11, 26, 32, 56, 68, 76, 115, 117, 134, 150, 163, 168, 177};
+	//static const int GOLOMB[M+1] = {0, 1, 4, 11, 26, 32, 56, 68, 76, 115, 117, 134, 150, 163, 168, 177};
     static const int MEMORY_MINUS_GOLOMB[M+1] = {177,  176,  173,  166,  151,  145,  121,  109,  101,  62,  60,  43,  27,  14, 9,  0};
 	#define MEMORY 177
 #endif
@@ -684,14 +684,14 @@ uint32_t errorlocFromSyn(uint32_t x) {
 // Fast algebraically defined systematizing permutations
 // This function returns the syndrome corresponding to an error location
 // Equivalently, this function defines the columns of the parity-check matrix
-inline uint32_t synFromErrorloc(uint32_t x) {
+static inline __attribute__((always_inline)) uint32_t synFromErrorloc(uint32_t x) {
 	return (((a*x+b)&mask)<<1)^1; 
 }
 // This function returns the error location corresponding to a syndrome
 // In the case of shortening, out of range syndromes will lead to a
 // negative result which will wrap around to a value greater than
 // S*(M+1)-1 since the type is unsigned. 
-inline uint32_t errorlocFromSyn(uint32_t x) { 
+static inline __attribute__((always_inline)) uint32_t errorlocFromSyn(uint32_t x) {
 	return (ainv*((x>>1)+mb))&mask;
 }
 
@@ -715,7 +715,7 @@ inline uint32_t errorlocFromSyn(uint32_t x) {
 
 // Assumes block is NewestBlock-0, NewestBlock-1, ..., NewestBlock-(W-1-MEMORY)
 // i.e., "age" of block is less than or equal to W-1-MEMORY
-void flip(uint32_t block, uint32_t posn) {
+static inline __attribute__((always_inline)) void flip(uint32_t block, uint32_t posn) {
     int i, j, k;
     unsigned char *p = RXbuffer + block*SS + posn;
     if (*p) { /* is this a one? */
@@ -734,7 +734,7 @@ void flip(uint32_t block, uint32_t posn) {
 }
 // Assumes block is NewestBlock-(W-1-MEMORY)-1, NewestBlock-(W-1-MEMORY)-2, ..., NewestBlock-(W-1-MEMORY)-MEMORY = NewestBlock-(W-1)
 // i.e., "age" of block is greater than W-1-MEMORY, or block is one of the MEMORY oldest blocks
-void flip_old(uint32_t block, uint32_t posn, uint32_t age) {
+static inline __attribute__((always_inline)) void flip_old(uint32_t block, uint32_t posn, uint32_t age) {
     int i, j, k;
     unsigned char *p = RXbuffer + block*SS + posn;
     if (*p) { /* is this a one? */
@@ -770,7 +770,7 @@ void flip_old(uint32_t block, uint32_t posn, uint32_t age) {
 
 #define F_ONE_MSB 0x3f800000
 #define F_MANTISSA 0x7fffff
-void ReceiveBlock(float p){
+static inline __attribute__((always_inline)) void ReceiveBlock(float p) {
     int posn;
     float k;
     union { float r; uint32_t i; } x;
@@ -794,7 +794,7 @@ void ReceiveBlock(float p){
 }
 // Rejects bit flips unless they occur in the parity parity columns
 // S-parity + 0, S-parity + 1, ..., S-parity + (parity-1) == S-1
-void ReceivePseudoterminationBlock(float p){
+static inline __attribute__((always_inline)) void ReceivePseudoterminationBlock(float p) {
     int posn;
     float k;
     union { float r; uint32_t i; } x;
@@ -822,7 +822,7 @@ void ReceivePseudoterminationBlock(float p){
    perform the initial set up:
     --- set up global variables in a state ready to receive first block
 */
-void Initialize(){
+static inline __attribute__((always_inline)) void Initialize() {
     /* zero global arrays */
     memset(RXbuffer, 0, S*S*W*sizeof(unsigned char));
     memset(Syndrome, 0, S*W*sizeof(uint32_t));
@@ -875,7 +875,8 @@ int sweep() {
                     j = errorloc % S;     /* j is the column index */
                     perm = M - errorloc/S;
                     //flip_old((block+MEMORY-GOLOMB[perm])%W, pos[perm](i, j), k+GOLOMB[perm]);
-                    flip_old((block+MEMORY_MINUS_GOLOMB[perm])%W, pos[perm](i, j), k+GOLOMB[perm]);
+                    //flip_old((block+MEMORY_MINUS_GOLOMB[perm])%W, pos[perm](i, j), k+GOLOMB[perm]);
+					flip_old((block+MEMORY_MINUS_GOLOMB[perm])%W, pos[perm](i, j), k+MEMORY-MEMORY_MINUS_GOLOMB[perm]);
                     count += 1;
                 }
             }
@@ -1219,19 +1220,6 @@ int main(int argc, char **argv){
         goto usage;
     }
 	// End of processing command-line arguments
-
-	
-/*
-	printf("\n");
-	printf("GOLOMB RULER OF ORDER %d and length %d:\n", M+1, MEMORY);
-	for (int i = 0; i < (M+1); ++i) {
-		printf("RULER MARK %d: %d\n", i, GOLOMB[i]);
-	}
-	printf("\n");
-*/
-
-
-
 
     if (VERBOSE)
     {
