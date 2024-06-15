@@ -144,6 +144,11 @@
 /* The following parameters completely specify the code and decoding scheme: */
 // Decoding window size is W, suggested value is 2*(MEMORY+1) to 5*(MEMORY+1)
 // The MEMORY parameter is not to be modified directly, only via M 
+/*
+ * PLEASE CHOOSE M TO BE LESS THAN OR EQUAL TO THE LEAST PRIME FACTOR OF S.
+ * OTHERWISE, A NON-SCATTERING IMPROPER GENERALIZED STAIRCASE CODE IS FORMED
+ * LEADING TO A LARGE ERROR FLOOR.
+ */
 #define S 179
 #define M 4
 #if (M == 0)
@@ -213,9 +218,9 @@
 #endif
 #define W (3*(MEMORY+1))
 #define F 1634
+
 // Number of iterations (unless specified by command-line argument -s)
 #define DefaultSweepsPerBlock 4
-
 
 /* 	The following parameters are the simulation parameters unless 
 	specified by command-line argument: */
@@ -702,39 +707,14 @@ static inline __attribute__((always_inline)) uint32_t errorlocFromSyn(uint32_t x
  * We assume 0 <= block < W, and 0 <= posn < S*S.
  */
 /*
- * We have two flipping functions. flip_old is for the
- * MEMORY oldest blocks for which we have fewer associated
- * syndromes since part of the corresponding component codewords
- * has been dumped/delivered.
- * We don't want to wrap around and modify the partial syndromes
- * corresponding to the MEMORY newest blocks in this case.
- * flip_old requires the "age" of a block which can be counted
- * and passed to it during a decoding sweep/iteration.
- * flip is for the W-MEMORY newest blocks.
+ * The MEMORY oldest blocks have fewer associated syndromes
+ * since part of the corresponding component codewords has been
+ * dumped/delivered. We don't want to wrap around and modify the
+ * partial syndromes corresponding to the MEMORY newest blocks in
+ * this case. For this reason, we pass the "age" of a block which
+ * can be counted during a decoding sweep/iteration.
  */
-
-// Assumes block is NewestBlock-0, NewestBlock-1, ..., NewestBlock-(W-1-MEMORY)
-// i.e., "age" of block is less than or equal to W-1-MEMORY
-static inline __attribute__((always_inline)) void flip(uint32_t block, uint32_t posn) {
-    int i, j, k;
-    unsigned char *p = RXbuffer + block*SS + posn;
-    if (*p) { /* is this a one? */
-        --BlockWeight[block];
-        *p = '\0';
-    } else {
-        ++BlockWeight[block];
-        *p = '\1';
-    }
-    for (k=M; k >= 0; --k) {
-        i = row[k](posn);
-        j = col[k](posn);
-        //Syndrome[((block-MEMORY+GOLOMB[k]+W)%W)*S+i] ^= synFromErrorloc((M-k)*S+j);
-        Syndrome[((block-MEMORY_MINUS_GOLOMB[k]+W)%W)*S+i] ^= synFromErrorloc((M-k)*S+j);
-    }
-}
-// Assumes block is NewestBlock-(W-1-MEMORY)-1, NewestBlock-(W-1-MEMORY)-2, ..., NewestBlock-(W-1-MEMORY)-MEMORY = NewestBlock-(W-1)
-// i.e., "age" of block is greater than W-1-MEMORY, or block is one of the MEMORY oldest blocks
-static inline __attribute__((always_inline)) void flip_old(uint32_t block, uint32_t posn, uint32_t age) {
+static inline __attribute__((always_inline)) void flip(uint32_t block, uint32_t posn, uint32_t age) {
     int i, j, k;
     unsigned char *p = RXbuffer + block*SS + posn;
     if (*p) { /* is this a one? */
@@ -746,10 +726,9 @@ static inline __attribute__((always_inline)) void flip_old(uint32_t block, uint3
     }
     k = M;
     while (1) {
-        if (MEMORY_MINUS_GOLOMB[k]+age >= W) break;
+        if (k < 0 || MEMORY_MINUS_GOLOMB[k]+age >= W) break;
         i = row[k](posn);
         j = col[k](posn);
-        //Syndrome[((block-MEMORY+GOLOMB[k]+W)%W)*S+i] ^= synFromErrorloc((M-k)*S+j);
         Syndrome[((block-MEMORY_MINUS_GOLOMB[k]+W)%W)*S+i] ^= synFromErrorloc((M-k)*S+j);
         k--;
     }
@@ -788,7 +767,7 @@ static inline __attribute__((always_inline)) void ReceiveBlock(float p) {
         if (posn >= SS) {
 			break;
         } else {
-			flip(NewestBlock, posn);
+			flip(NewestBlock, posn, 0);
 		}
     }
 }
@@ -812,7 +791,7 @@ static inline __attribute__((always_inline)) void ReceivePseudoterminationBlock(
         if (posn >= SS) {
 			break;
 		} else if ((posn%S) >= (S-parity)) { 
-			flip(NewestBlock, posn);
+			flip(NewestBlock, posn, 0);
 		}
     }
 }
@@ -846,11 +825,8 @@ int sweep() {
     // are not yet completed.
     // Therefore, decoding starts at NewestBlock-MEMORY and decrements
     // covering W-MEMORY completed syndrome groups.
-    // First, we do the W-2*MEMORY newest syndrome groups
-    // and then the MEMORY oldest for a total of (W-MEMORY) syndrome groups
-    // or (W-MEMORY)*S decodings
     block = (NewestBlock-MEMORY+W)%W;
-    for (k=0; k < W-2*MEMORY; ++k) {
+    for (k=0; k < W-MEMORY; ++k) {
         for (i=0; i < S; ++i) {
             syn = Syndrome[block*S + i];
             if (syn & 0x01) {
@@ -858,25 +834,7 @@ int sweep() {
                 if (errorloc < S*(M+1)) {
                     j = errorloc % S;     /* j is the column index */
                     perm = M - errorloc/S;
-                    //flip((block+MEMORY-GOLOMB[perm])%W, pos[perm](i, j));
-                    flip((block+MEMORY_MINUS_GOLOMB[perm])%W, pos[perm](i, j));
-                    count += 1;
-                }
-            }
-        }
-        if (--block < 0) block = W-1; // mod W decrement
-    }
-    for (k = W-2*MEMORY; k < W-MEMORY; ++k) {
-        for (i=0; i < S; ++i) {
-            syn = Syndrome[block*S + i];
-            if (syn & 0x01) {
-                errorloc = errorlocFromSyn(syn);
-                if (errorloc < S*(M+1)) {
-                    j = errorloc % S;     /* j is the column index */
-                    perm = M - errorloc/S;
-                    //flip_old((block+MEMORY-GOLOMB[perm])%W, pos[perm](i, j), k+GOLOMB[perm]);
-                    //flip_old((block+MEMORY_MINUS_GOLOMB[perm])%W, pos[perm](i, j), k+GOLOMB[perm]);
-					flip_old((block+MEMORY_MINUS_GOLOMB[perm])%W, pos[perm](i, j), k+MEMORY-MEMORY_MINUS_GOLOMB[perm]);
+                    flip((block+MEMORY_MINUS_GOLOMB[perm])%W, pos[perm](i, j), k+MEMORY-MEMORY_MINUS_GOLOMB[perm]);
                     count += 1;
                 }
             }
@@ -1038,8 +996,7 @@ int main(int argc, char **argv){
     pcg32_srandom_r(PRNG_SEED, PRNG_SEED*17);
     //pcg32_srandom_r(time(NULL), time(NULL)*17);
     //pcg32_srandom_r(123456789,987654321);  /* for debugging */
-	//pcg32_srandom_r(123,991);  /* for debugging */
-	
+
     float p;  /* BSC crossover probability  */
     float g;  /* gap in dB to Shannon limit */
     double R; // Code rate
@@ -1243,34 +1200,6 @@ int main(int argc, char **argv){
         fprintf(stderr, "Maximum number of batches = %lu.\n", ActualMaxBatches);
         fprintf(stderr, "Will stop at %lu frame errors.\n", ActualErrorsToFind);
     }
-		
-	
-	// Test systematizing permutation functions
-	uint32_t test_1 = 1;
-	for (uint32_t j = 0; j < (M+1)*S; ++j) {
-		test_1 = test_1 && (errorlocFromSyn(synFromErrorloc(j)) == j);
-		//printf("loc = %d syn = %u \n",j,  synFromErrorloc(j));
-	}
-	//printf("\ntest_1 result = %d\n\n", test_1);
-	uint32_t loc_res;
-	uint32_t syn_count = 0;
-	uint32_t test_2 = 1;
-	for (uint32_t j = 0; j < (1<<m); ++j) {
-		loc_res = errorlocFromSyn(2*j+1);
-		if (loc_res < (M+1)*S) {
-			test_2 = test_2 && (synFromErrorloc(loc_res) == 2*j + 1);
-			++syn_count;
-		} 
-		//printf("syn = %d loc = %u \n", 2*j+1, loc_res);
-	}
-	//printf("\ntest_2 result = %d\n", test_1);
-	//printf("\nsyn_count = %u, should be %d \n\n", syn_count, (M+1)*S);
-	if ((test_1&&test_2&&(syn_count == S*(M+1))) != 1) {
-		printf("Systematizing permutation tests failed!\n");
-		return 1;
-	}
-	//return 1;
-	
 
 	/**** start of simulation ****/
 	
