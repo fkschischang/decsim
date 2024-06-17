@@ -242,220 +242,46 @@
 #include <unistd.h>
 #define SS (S*S)
 
-/********************************************************************
-   PERMUTATIONS
 
-   Bijections between position in a vector of length S*S
-   and row/column indices in an S by S matrix.
+// Involution permutation option
+// Forward permutation: multiplying by
+// [-(k-1)   1-(k-1)^2]
+// [   1        k-1   ]
+// Inverse permutation: the same
+//0 <= k <= M <= lpf(S) <= S
+int64_t pos(int64_t i, int64_t j, int64_t k) {
+    return k == 0 ? i*S + j : (((S-(k-1))*i + j)%S)*S + ((S*S+1-(k-1)*(k-1))*i+(k-1)*j)%S;
+}
+int64_t row(int64_t p, int64_t k) {
+    return k == 0 ? p/S : ((S-(k-1))*(p/S) + p)%S;
+}
+int64_t col(int64_t p, int64_t k) {
+    return k == 0 ? p%S : ((S*S+1-(k-1)*(k-1))*(p/S)+(k-1)*p)%S;
+}
 
-   Different bijections are defined via linear transformations
-   of row/column indices (i,j).  Consider the map
 
-   (i,j) -> (i,j) [ a b ] = (i',j'), with operations in Z_S,
-                  [ c d ]
+// // Non-involution permutation option
+// // Forward permutation: multiplying by
+// // [   0         1    ]
+// // [   1        k-1   ]
+// // Inverse permutation:
+// // [-(k-1)       1    ]
+// // [   1         0    ]
+// //0 <= k <= M <= lpf(S) <= S
+// int64_t pos(int64_t i, int64_t j, int64_t k) {
+//     return k == 0 ? i*S + j : j*S + (i+(k-1)*j)%S;
+// }
+// int64_t row(int64_t p, int64_t k) {
+//     return k == 0 ? p/S : ((S-(k-1))*(p/S) + p)%S;
+// }
+// int64_t col(int64_t p, int64_t k) {
+//     return k == 0 ? p%S : p/S;
+// }
 
-   where ad-bc = 1 or -1 (or in general is an invertible element mod S).
-   Let D = 1/(ad-bc) in Z_S.
 
-   We then recover (i,j) from (i',j') via
-   (i,j) = D * (i',j') [ d -b ].
-                       [-c  a ]
-
-   Let p be an element of {0,1, ..., S*S-1}, and let a,b,c,d be given.
-   We map p to
-
-   (i,j) = (p/S, p%S) [ a b ]
-                      [ c d ]
-
-         = ( (a*(p/S) + c*p)%S , (b*(p/S) + d*p)%S )
-
-   We then recover p from (i,j) as follows.  Note that
-
-   (p/S,p%S) =  D (i,j) [ d -b ] = (d*i - c*j, a*j - b*i) mod S
-                        [ -c a ]
-             =  ( D*( E*S + d*i - c*j )%S, D*(F*S + a*j - b*i)%S )
-   where E must be chosen so that E*S + d*i - c*j is nonnegative and
-         F must be chosen so that F*S + a*j - b*i is nonnegative.
-
-   Then p = S*(p/S) + p%S.
-*/
-
-/// Permutation definitions
-// Specify a, b, c, d, and invdet = 1/(ad-bc) 
-// MUST USE NON-NEGATIVE MOD S REPRESENTATIVES FOR THESE VALUES  
-// The permutation applied to the blocks is the INVERSE of the specified
-// permutation, i.e., corresponding to the INVERSE of the matrix
-// [a b]
-// [c d]
-
-#define A1 0
-#define B1 1
-#define C1 1
-#define D1 0
-#define INVDET1 (S-1)
- 
-#define A2 (S-1)
-#define B2 0
-#define C2 1
-#define D2 1
-#define INVDET2 (S-1)
- 
-#define A3 (S-2)
-#define B3 (S*S-3)
-#define C3 1
-#define D3 2
-#define INVDET3 (S-1)
- 
-#define A4 (S-3)
-#define B4 (S*S-8)
-#define C4 1
-#define D4 3
-#define INVDET4 (S-1)
- 
-#define A5 (S-4)
-#define B5 (S*S-15)
-#define C5 1
-#define D5 4
-#define INVDET5 (S-1)
- 
-#define A6 (S-5)
-#define B6 (S*S-24)
-#define C6 1
-#define D6 5
-#define INVDET6 (S-1)
- 
-#define A7 (S-6)
-#define B7 (S*S-35)
-#define C7 1
-#define D7 6
-#define INVDET7 (S-1)
- 
-#define A8 (S-7)
-#define B8 (S*S-48)
-#define C8 1
-#define D8 7
-#define INVDET8 (S-1)
- 
-#define A9 (S-8)
-#define B9 (S*S-63)
-#define C9 1
-#define D9 8
-#define INVDET9 (S-1)
- 
-#define A10 (S-9)
-#define B10 (S*S-80)
-#define C10 1
-#define D10 9
-#define INVDET10 (S-1)
- 
-#define A11 (S-10)
-#define B11 (S*S-99)
-#define C11 1
-#define D11 10
-#define INVDET11 (S-1)
- 
-#define A12 (S-11)
-#define B12 (S*S-120)
-#define C12 1
-#define D12 11
-#define INVDET12 (S-1)
- 
-#define A13 (S-12)
-#define B13 (S*S-143)
-#define C13 1
-#define D13 12
-#define INVDET13 (S-1)
- 
-#define A14 (S-13)
-#define B14 (S*S-168)
-#define C14 1
-#define D14 13
-#define INVDET14 (S-1)
- 
-#define A15 (S-14)
-#define B15 (S*S-195)
-#define C15 1
-#define D15 14
-#define INVDET15 (S-1)
-
-// Permutation functions
-int64_t pos_0(int64_t i, int64_t j) { return i*S + j; }
-int64_t row_0(int64_t p) { return p/S; }
-int64_t col_0(int64_t p) { return p%S; }
-
-int64_t pos_1(int64_t i, int64_t j) { return S*((INVDET1*(D1*i - C1*(j-S)))%S) + (INVDET1*(A1*j - B1*(i-S)))%S; } 
-int64_t row_1(int64_t p) { return (A1*(p/S) + C1*p)%S; } 
-int64_t col_1(int64_t p) { return (B1*(p/S) + D1*p)%S; } 
-
-int64_t pos_2(int64_t i, int64_t j) { return S*((INVDET2*(D2*i - C2*(j-S)))%S) + (INVDET2*(A2*j - B2*(i-S)))%S; } 
-int64_t row_2(int64_t p) { return (A2*(p/S) + C2*p)%S; } 
-int64_t col_2(int64_t p) { return (B2*(p/S) + D2*p)%S; } 
-
-int64_t pos_3(int64_t i, int64_t j) { return S*((INVDET3*(D3*i - C3*(j-S)))%S) + (INVDET3*(A3*j - B3*(i-S)))%S; } 
-int64_t row_3(int64_t p) { return (A3*(p/S) + C3*p)%S; } 
-int64_t col_3(int64_t p) { return (B3*(p/S) + D3*p)%S; } 
-
-int64_t pos_4(int64_t i, int64_t j) { return S*((INVDET4*(D4*i - C4*(j-S)))%S) + (INVDET4*(A4*j - B4*(i-S)))%S; } 
-int64_t row_4(int64_t p) { return (A4*(p/S) + C4*p)%S; } 
-int64_t col_4(int64_t p) { return (B4*(p/S) + D4*p)%S; } 
-
-int64_t pos_5(int64_t i, int64_t j) { return S*((INVDET5*(D5*i - C5*(j-S)))%S) + (INVDET5*(A5*j - B5*(i-S)))%S; } 
-int64_t row_5(int64_t p) { return (A5*(p/S) + C5*p)%S; } 
-int64_t col_5(int64_t p) { return (B5*(p/S) + D5*p)%S; } 
-
-int64_t pos_6(int64_t i, int64_t j) { return S*((INVDET6*(D6*i - C6*(j-S)))%S) + (INVDET6*(A6*j - B6*(i-S)))%S; } 
-int64_t row_6(int64_t p) { return (A6*(p/S) + C6*p)%S; } 
-int64_t col_6(int64_t p) { return (B6*(p/S) + D6*p)%S; } 
-
-int64_t pos_7(int64_t i, int64_t j) { return S*((INVDET7*(D7*i - C7*(j-S)))%S) + (INVDET7*(A7*j - B7*(i-S)))%S; } 
-int64_t row_7(int64_t p) { return (A7*(p/S) + C7*p)%S; } 
-int64_t col_7(int64_t p) { return (B7*(p/S) + D7*p)%S; } 
-
-int64_t pos_8(int64_t i, int64_t j) { return S*((INVDET8*(D8*i - C8*(j-S)))%S) + (INVDET8*(A8*j - B8*(i-S)))%S; } 
-int64_t row_8(int64_t p) { return (A8*(p/S) + C8*p)%S; } 
-int64_t col_8(int64_t p) { return (B8*(p/S) + D8*p)%S; } 
-
-int64_t pos_9(int64_t i, int64_t j) { return S*((INVDET9*(D9*i - C9*(j-S)))%S) + (INVDET9*(A9*j - B9*(i-S)))%S; } 
-int64_t row_9(int64_t p) { return (A9*(p/S) + C9*p)%S; } 
-int64_t col_9(int64_t p) { return (B9*(p/S) + D9*p)%S; } 
-
-int64_t pos_10(int64_t i, int64_t j) { return S*((INVDET10*(D10*i - C10*(j-S)))%S) + (INVDET10*(A10*j - B10*(i-S)))%S; } 
-int64_t row_10(int64_t p) { return (A10*(p/S) + C10*p)%S; } 
-int64_t col_10(int64_t p) { return (B10*(p/S) + D10*p)%S; } 
-
-int64_t pos_11(int64_t i, int64_t j) { return S*((INVDET11*(D11*i - C11*(j-S)))%S) + (INVDET11*(A11*j - B11*(i-S)))%S; } 
-int64_t row_11(int64_t p) { return (A11*(p/S) + C11*p)%S; } 
-int64_t col_11(int64_t p) { return (B11*(p/S) + D11*p)%S; } 
-
-int64_t pos_12(int64_t i, int64_t j) { return S*((INVDET12*(D12*i - C12*(j-S)))%S) + (INVDET12*(A12*j - B12*(i-S)))%S; } 
-int64_t row_12(int64_t p) { return (A12*(p/S) + C12*p)%S; } 
-int64_t col_12(int64_t p) { return (B12*(p/S) + D12*p)%S; } 
-
-int64_t pos_13(int64_t i, int64_t j) { return S*((INVDET13*(D13*i - C13*(j-S)))%S) + (INVDET13*(A13*j - B13*(i-S)))%S; } 
-int64_t row_13(int64_t p) { return (A13*(p/S) + C13*p)%S; } 
-int64_t col_13(int64_t p) { return (B13*(p/S) + D13*p)%S; } 
-
-int64_t pos_14(int64_t i, int64_t j) { return S*((INVDET14*(D14*i - C14*(j-S)))%S) + (INVDET14*(A14*j - B14*(i-S)))%S; } 
-int64_t row_14(int64_t p) { return (A14*(p/S) + C14*p)%S; } 
-int64_t col_14(int64_t p) { return (B14*(p/S) + D14*p)%S; } 
-
-int64_t pos_15(int64_t i, int64_t j) { return S*((INVDET15*(D15*i - C15*(j-S)))%S) + (INVDET15*(A15*j - B15*(i-S)))%S; } 
-int64_t row_15(int64_t p) { return (A15*(p/S) + C15*p)%S; } 
-int64_t col_15(int64_t p) { return (B15*(p/S) + D15*p)%S; } 
-
-typedef int64_t (*ZtoZ)(int64_t);  /* pointer to a function mapping int64_t to int64_t */
-typedef int64_t (*ZZtoZ)(int64_t, int64_t);  /* ptr to function mapping (int64_t,int64_t) to int64_t */
-
-/* The maximum encoder memory supported by the currently defined permutations */
-/* If you define more permutations, please remember to change this value. */
-#define MAXM 15
+#define MAXM S
 
 /* GLOBAL VARIABLES */
-
-/* pointers to bijection functions */
-ZZtoZ pos[MAXM+1] = {pos_0, pos_1, pos_2, pos_3, pos_4, pos_5, pos_6, pos_7, pos_8, pos_9, pos_10, pos_11, pos_12, pos_13, pos_14, pos_15};
-ZtoZ  row[MAXM+1] = {row_0, row_1, row_2, row_3, row_4, row_5, row_6, row_7, row_8, row_9, row_10, row_11, row_12, row_13, row_14, row_15};
-ZtoZ  col[MAXM+1] = {col_0, col_1, col_2, col_3, col_4, col_5, col_6, col_7, col_8, col_9, col_10, col_11, col_12, col_13, col_14, col_15};
 
 // All circular buffer indexing is modulo W
 
@@ -727,8 +553,8 @@ static inline __attribute__((always_inline)) void flip(uint32_t block, uint32_t 
     k = M;
     while (1) {
         if (k < 0 || MEMORY_MINUS_GOLOMB[k]+age >= W) break;
-        i = row[k](posn);
-        j = col[k](posn);
+        i = row(posn,k);
+        j = col(posn,k);
         Syndrome[((block-MEMORY_MINUS_GOLOMB[k]+W)%W)*S+i] ^= synFromErrorloc((M-k)*S+j);
         k--;
     }
@@ -834,7 +660,7 @@ int sweep() {
                 if (errorloc < S*(M+1)) {
                     j = errorloc % S;     /* j is the column index */
                     perm = M - errorloc/S;
-                    flip((block+MEMORY_MINUS_GOLOMB[perm])%W, pos[perm](i, j), k+MEMORY-MEMORY_MINUS_GOLOMB[perm]);
+                    flip((block+MEMORY_MINUS_GOLOMB[perm])%W, pos(i, j, perm), k+MEMORY-MEMORY_MINUS_GOLOMB[perm]);
                     count += 1;
                 }
             }
@@ -939,17 +765,17 @@ void SanityCheck()  /* triggered by -C command line switch */
     for (b=0; b < MAXM + 1; ++b) {
        printf("Checking bijection %d: ", b);
        for (p=0; p < SS; ++p) {
-           i = row[b](p);
-           j = col[b](p);
-           if (pos[b](i, j) != p) {
+           i = row(p,b);
+           j = col(p,b);
+           if (pos(i, j, b) != p) {
                printf("** failed at p=%d\n", p);
                exit(1);
            }
        }
        for (i=0; i < S; ++i) {
 		   for (j=0; j < S; ++j) {
-		       p = pos[b](i, j);
-		       if (row[b](p) != i || col[b](p) != j) {
+		       p = pos(i, j, b);
+		       if (row(p,b) != i || col(p,b) != j) {
 		           printf("** failed at row %d, col %d\n", i, j);
 		           exit(1);
 		       }
@@ -995,7 +821,8 @@ int main(int argc, char **argv){
     printf("PRNG_SEED = %lu \n", PRNG_SEED);
     pcg32_srandom_r(PRNG_SEED, PRNG_SEED*17);
     //pcg32_srandom_r(time(NULL), time(NULL)*17);
-    //pcg32_srandom_r(123456789,987654321);  /* for debugging */
+    // printf("SEED IGNORED\n");
+    // pcg32_srandom_r(123456789,987654321);  /* for debugging */
 
     float p;  /* BSC crossover probability  */
     float g;  /* gap in dB to Shannon limit */
