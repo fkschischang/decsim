@@ -279,7 +279,7 @@ int64_t col(int64_t p, int64_t k) {
 // }
 
 
-#define MAXM S
+#define MAXM 15
 
 /* GLOBAL VARIABLES */
 
