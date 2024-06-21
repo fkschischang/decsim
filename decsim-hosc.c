@@ -20,8 +20,8 @@
 	to 1, higher-order staircase codes are equivalent to generalized
 	staircase codes which are simulated by decsim-gsc.
 
-	THIS IS AN AN INITIAL VERSION OF THIS PROGRAM THAT HAS YET TO BE
-	THOROUGHLY COMMENTED AND VALIDATED.
+	decsim-hosc is accompanied by a pedagogical Julia model available
+	at https://github.com/applecoffeecake/hosc-Julia
 */
 
 /*
@@ -67,24 +67,32 @@
 */
 
 
-/* The following parameters completely specify the code and decoding scheme: */
-// Decoding window size is W, suggested value is 2*(1+SCOPE) to 5*(1+SCOPE)
+// The following parameters completely specify the code and decoding scheme:
 /*
+ * Decoding window size is W: suggested value is 2*(1+SCOPE) to 5*(1+SCOPE).
  * PLEASE CHOOSE M TO BE LESS THAN OR EQUAL TO THE LEAST PRIME FACTOR OF T.
  * OTHERWISE, A NON-SCATTERING, IMPROPER HIGHER-ORDER STAIRCASE IS FORMED
  * LEADING TO A LARGE ERROR FLOOR.
  */
-#define L 8
-#define T 23
+/*
+ * Currently supported values of L and M are
+ * if M = 1: all L up to 1000
+ * if M = 2: all L up to 1000
+ * if M = 3: all L up to 15
+ * if M = 4: all L up to 10 excluding 9
+ * if M = 5,6,7,8,9: L = 1
+ */
+#define L 7
+#define T 25 // least prime factor of T must be greater than or equal to M
 #define M 4
 #include "dts-defs.h"
-#define W (2*(1+SCOPE))
-#define F 20000
+#define W (2*(1+SCOPE) + 1*(1+SCOPE)/4)
+#define F (20000+W)
 // Number of iterations (unless overridden by command-line argument -s)
-#define DefaultSweepsPerBlock 4
-/* End of parameters specifying code and decoding scheme. */
+#define DefaultSweepsPerBlock 1
+// End of parameters specifying code and decoding scheme
 
-/* The following are simulation parameters; can be overridden by command-line argument: */
+// The following are simulation parameters; can be overridden by command-line argument:
 #define DefaultBatchSize 100
 #define DefaultErrorsToFind 10
 #define DefaultMaxBatches 10000000
@@ -92,7 +100,7 @@
 // How frequently to print simulation status in verbose mode
 #define STATUS_FREQUENCY 0xf
 
-/* End of simulation parameters. */
+// End of simulation parameters
 
 /***********************************************************************/
 
@@ -110,13 +118,13 @@
 // [   1        k-1   ]
 // Inverse permutation: the same
 //0 <= k <= M <= lpf(T) <= T
-int64_t pos(int64_t i, int64_t j, int64_t k) {
+static inline __attribute__((always_inline)) int64_t pos(int64_t i, int64_t j, int64_t k) {
     return k == 0 ? i*T + j : (((T-(k-1))*i + j)%T)*T + ((T*T+1-(k-1)*(k-1))*i+(k-1)*j)%T;
 }
-int64_t row(int64_t p, int64_t k) {
+static inline __attribute__((always_inline)) int64_t row(int64_t p, int64_t k) {
     return k == 0 ? p/T : ((T-(k-1))*(p/T) + p)%T;
 }
-int64_t col(int64_t p, int64_t k) {
+static inline __attribute__((always_inline)) int64_t col(int64_t p, int64_t k) {
     return k == 0 ? p%T : ((T*T+1-(k-1)*(k-1))*(p/T)+(k-1)*p)%T;
 }
 
@@ -147,7 +155,9 @@ int64_t col(int64_t p, int64_t k) {
 #define TLT (T*L*T)
 #define LT (L*T)
 
-// Receiver circular buffer of W rectangles of T*(L*T) bits:
+// Receiver circular buffer of W rectangles of TLT bits.
+// Within a rectangle are L blocks of TT bits with
+// row-major order for bits within a block.
 unsigned char RXbuffer[W*TLT];
 
 /* Index of the "Newest" (most recently received)
@@ -158,9 +168,11 @@ uint32_t NewestRect;
  * Circular buffer of W groups of T syndromes.
  * The group with modulo-W index i consists of the T syndromes
  * corresponding to the T component codewords which START in rectangle i.
- * These this group involves blocks from rectangle i to rectangle i + SCOPE.
+ * This group involves blocks from rectangle i to rectangle i + SCOPE.
  * It involves ALL blocks from the rectangle i + SCOPE, but DIFFERENT blocks
  * from rectangles i+SCOPE-1, i+SCOPE-2, ..., i+SCOPE-SCOPE.
+ * Refer to the Julia model for more details:
+ * 	https://github.com/applecoffeecake/hosc-Julia
  * The SCOPE newest syndrome groups are groups of partial syndromes since the
  * remainder of the corresponding component codewords has not been received yet.
  * The W-SCOPE oldest syndrome groups correspond to complete component codewords
@@ -406,9 +418,11 @@ static inline __attribute__((always_inline)) uint32_t errorlocFromSyn(uint32_t x
  * this case. For this reason, we pass the "age" of a rectangle which
  * can be counted during a decoding sweep/iteration.
  */
-static inline __attribute__((always_inline)) void flip(uint32_t rect, uint32_t class, uint32_t posn, uint32_t age) {
+// c_class = L-1-class
+// SCOPE-DTS[class][k] = SCOPE_MINUS_DTS_c[c_class][k]
+static inline __attribute__((always_inline)) void flip(uint32_t rect, uint32_t c_class, uint32_t posn, uint32_t age) {
     int i, j, k;
-    unsigned char *p = RXbuffer + rect*TLT + (L-1-class)*TT + posn;
+    unsigned char *p = RXbuffer + rect*TLT + c_class*TT + posn;
     if (*p) { /* is this a one? */
         --RectWeight[rect];
         *p = '\0';
@@ -418,25 +432,22 @@ static inline __attribute__((always_inline)) void flip(uint32_t rect, uint32_t c
     }
     k = M;
     while (1) {
-        if (k < 0 || SCOPE-DTS[class][k]+age >= W) break;
+        if (k < 0 || SCOPE_MINUS_DTS_c[c_class][k]+age >= W) break;
         i = row(posn,k);
         j = col(posn,k);
-        Syndrome[((rect-SCOPE+DTS[class][k]+W)%W)*T+i] ^= synFromErrorloc(((M-k)*L+(L-1-class))*T+j);
+        Syndrome[((rect-SCOPE_MINUS_DTS_c[c_class][k]+W)%W)*T+i] ^= synFromErrorloc(((M-k)*L+c_class)*T+j);
         k--;
     }
 }
 
 /* The following function creates a new "newest" received rectangle
    from a binary symmetric channel with crossover probability p.
-
    The following operations are performed.
-
-   1.  The index of the newest rectangle is incremented.
-   3.  The buffer associated with the previous oldest block is zeroed.
-   4.  The syndromes associated with the previous oldest block are zeroed.
-   5.  The weight of the previous oldest rectangle is set to zero.
-   6.  Bits are randomly flipped (taking geometric jumps) in the
-       newest block until the end of the rectangle is reached.
+	1. The index of the newest rectangle is incremented and becomes
+	   the location of the previous oldest block which is to be overwritten.
+	2. The data, syndrome, and weight buffers are zeroed at this new index.
+	3. Bits are randomly flipped (taking geometric jumps) in the newest
+	   rectangle until the end of the rectangle is reached.
 */
 
 #define F_ONE_MSB 0x3f800000
@@ -459,7 +470,7 @@ static inline __attribute__((always_inline)) void ReceiveRect(float p) {
         if (rectposn >= TLT) {
 			break;
         } else {
-			flip(NewestRect, L-1-rectposn/TT, rectposn%TT, 0);
+			flip(NewestRect, rectposn/TT, rectposn%TT, 0);
 		}
     }
 }
@@ -483,7 +494,7 @@ static inline __attribute__((always_inline)) void ReceivePseudoterminationRect(f
         if (rectposn >= TLT) {
 			break;
 		} else if ((rectposn/TT)*T + (rectposn%TT)%T >= (LT-parity)) {
-			flip(NewestRect, L-1-rectposn/TT, rectposn%TT, 0);
+			flip(NewestRect, rectposn/TT, rectposn%TT, 0);
 		}
     }
 }
@@ -503,10 +514,12 @@ static inline __attribute__((always_inline)) void Initialize() {
 
 
 /* Sweep through all syndromes; return the number of corrections performed. */
-
+// c_class = L-1-class
+// SCOPE-DTS[class][perm] = SCOPE_MINUS_DTS_c[c_class][perm]
+// DTS[class][perm] = SCOPE-SCOPE_MINUS_DTS_c[c_class][perm]
 int sweep() {
     int i, j; // error coords within block
-    int j_rect, class; // error column within rectangle, class (block label) within rectangle
+    int j_rect, c_class; // error column within rectangle, class (block label) within rectangle
     int k;      /* loop index                    */
     int rect;  /* rectangle index                   */
     uint32_t syn;  /* syndrome value */
@@ -528,8 +541,8 @@ int sweep() {
                     j_rect = errorloc % LT; // column within rect
                     perm = M - errorloc/LT; // rect within codeword span
                     j = j_rect%T;
-                    class = L-1-j_rect/T;
-                    flip((rect+SCOPE-DTS[class][perm])%W, class, pos(i, j, perm), k+DTS[class][perm]);
+                    c_class = j_rect/T;
+                    flip((rect+SCOPE_MINUS_DTS_c[c_class][perm])%W, c_class, pos(i, j, perm), k+SCOPE-SCOPE_MINUS_DTS_c[c_class][perm]);
                     count += 1;
                 }
             }
@@ -687,9 +700,9 @@ int main(int argc, char **argv){
     }
     /* seed the prng using current system time and process ID */
     uint64_t PRNG_SEED = time(NULL) ^ (getpid()*getpid());
-    printf("PRNG_SEED = %lu \n", PRNG_SEED);
+    printf("PRNG_SEED from time and pid: %lu \n", PRNG_SEED);
     pcg32_srandom_r(PRNG_SEED, PRNG_SEED*17);
-    //pcg32_srandom_r(time(NULL), time(NULL)*17);
+    // pcg32_srandom_r(time(NULL), time(NULL)*17);
     // printf("SEED IGNORED\n");
     // pcg32_srandom_r(123456789,987654321);  /* for debugging */
 
@@ -720,7 +733,6 @@ int main(int argc, char **argv){
 
     time_t then, now;  /* to estimate throughput */
     
-    
     m = (uint32_t) pow2ge((M+1)*LT);
 	if (m < 3 || m > 16) {
 		printf("Component code length not supported! (m = %d)\n", m);
@@ -735,10 +747,14 @@ int main(int argc, char **argv){
 	
 	parity = ((int) m) + 1;
     
+	if (parity >= LT) {
+		printf("parity = %d, LT = %d: need parity < LT, LT too small!\n", parity, LT);
+		return 1;
+	}
+
     R_nominal = 1.0 - (double)parity/(double)LT;
 	R_framing = (double)((F-W)*LT)/(double)((F-W)*LT + W*parity);
 	R = R_nominal*R_framing;
-	 
 
     /*** process command line arguments ***/
     if (argc < 2) goto usage;
@@ -872,10 +888,10 @@ int main(int argc, char **argv){
     {
        /* print some useful information */
         fprintf(stderr,
-            "Simulating L = %d, M = %d, SCOPE = %d, T = %d, (M+1)LT = %d, %d parity bits, R = %lf\n",
+            "Simulating L = %d, M = %d, SCOPE = %d, T = %d, (M+1)LT = %d, %d parity bits,\nR = %lf",
             L, M, SCOPE, T, (M+1)*LT, parity, R);
         fprintf(stderr,
-            "at p = %g corresponding to gap-to-Shannon of %lf dB.\n",
+            " at p = %g corresponding to gap-to-Shannon of %lf dB.\n",
             p, dbgaptoshannon(R, p));
 		fprintf(stderr,
             "R_nominal = %lf and R_framing = %lf with F = %d.\n", R_nominal, R_framing, F);
@@ -964,9 +980,9 @@ int main(int argc, char **argv){
 	
 	printf("\nFINAL RESULTS:\n");
 	printf("Parameters:\n");
-	printf("Simulated L = %d, M = %d, SCOPE = %d, T = %d, (M+1)LT = %d, %d parity bits, R = %lf\n",
+	printf("Simulated L = %d, M = %d, SCOPE = %d, T = %d, (M+1)LT = %d, %d parity bits,\nR = %lf",
             L, M, SCOPE, T, (M+1)*LT, parity, R);
-	printf("at p = %g corresponding to gap-to-Shannon of %lf dB.\n",
+	printf(" at p = %g corresponding to gap-to-Shannon of %lf dB.\n",
             p, dbgaptoshannon(R, p));
 	printf("R_nominal = %lf and R_framing = %lf with F = %d.\n", R_nominal, R_framing, F);
 	printf("Each frame contained %d %d-by-%d information chunks\n", F-W, T, (LT-parity));
