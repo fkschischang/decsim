@@ -410,7 +410,7 @@ static inline __attribute__((always_inline)) uint32_t errorlocFromSyn(uint32_t x
  * Functions for flipping the bit in a given position
  * by updating the state of the three circular buffers
  * RXbuffer, Syndrome, and RectWeight.
- * We have 0 <= rect < T, 0 <= posn < T*T, 0 <= class <= L-1
+ * We have 0 <= rect < W, 0 <= posn < T*T, 0 <= class <= L-1
  */
 /*
  * The SCOPE oldest blocks have fewer associated syndromes
