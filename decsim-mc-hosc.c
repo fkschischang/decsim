@@ -1,5 +1,5 @@
 /*
-	Copyright 2023-2024 Frank R. Kschischang and Mohannad Shehadeh <{frank,mshehadeh}@ece.utoronto.ca>
+	Copyright 2023-2025 Frank R. Kschischang and Mohannad Shehadeh <{frank,mshehadeh}@ece.utoronto.ca>
 
 	Licensed under the Apache License, Version 2.0 (the "License");
 	you may not use this file except in compliance with the License.
@@ -82,15 +82,15 @@
  * if M = 1: all L up to 1000
  * if M = 2: all L up to 1000
  * if M = 3: all L up to 15
- * if M = 4: all L up to 10 excluding 9
+ * if M = 4: all L up to 15
  * if M = 5,6,7,8,9: L = 1
  */
-#define L 9
-#define M 3
-#define T 7 // least prime factor of T must be greater than or equal to M
+#define L 15
+#define M 4
+#define T 5 // least prime factor of T must be greater than or equal to M
 #define C 2
 #include "dts-defs.h"
-#define W (3*(1+SCOPE))
+#define W (2*(1+SCOPE)+(1+SCOPE)/4)
 #define F (100*1000+W)
 // Number of iterations (unless overridden by command-line argument -s)
 #define DefaultSweepsPerBlock 1
