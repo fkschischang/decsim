@@ -1,5 +1,5 @@
 /*
-	Copyright 2023-2024 Frank R. Kschischang and Mohannad Shehadeh <{frank,mshehadeh}@ece.utoronto.ca>
+	Copyright 2023-2025 Frank R. Kschischang and Mohannad Shehadeh <{frank,mshehadeh}@ece.utoronto.ca>
 
 	Licensed under the Apache License, Version 2.0 (the "License");
 	you may not use this file except in compliance with the License.
@@ -81,11 +81,11 @@
  * if M = 1: all L up to 1000
  * if M = 2: all L up to 1000
  * if M = 3: all L up to 15
- * if M = 4: all L up to 10 excluding 9
+ * if M = 4: all L up to 15
  * if M = 5,6,7,8,9: L = 1
  */
-#define L 7
-#define T 25 // least prime factor of T must be greater than or equal to M
+#define L 14
+#define T 13 // least prime factor of T must be greater than or equal to M
 #define M 4
 #include "dts-defs.h"
 #define W (2*(1+SCOPE) + 1*(1+SCOPE)/4)
